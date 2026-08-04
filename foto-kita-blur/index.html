@@ -58,7 +58,7 @@
             display: none;
         }
 
-        /* Layer 1: Background Video Canvas (Gets Soft Blur) */
+        /* Layer 1: Background Video Canvas (HD Retina Scaled + Soft Blur) */
         #bg-canvas {
             position: absolute;
             top: 0;
@@ -70,13 +70,15 @@
             transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             will-change: filter;
             z-index: 1;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
 
         #bg-canvas.blurred {
             filter: blur(10px) brightness(0.92);
         }
 
-        /* Layer 2: Foreground Overlay Canvas (ALWAYS 100% CRISP & SHARP) */
+        /* Layer 2: Foreground Overlay Canvas (Retina High-DPI Sharp) */
         #fg-canvas {
             position: absolute;
             top: 0;
@@ -87,6 +89,8 @@
             transform: scaleX(-1);
             pointer-events: none;
             z-index: 2;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
 
         /* Glassmorphic UI Header Badge */
@@ -157,7 +161,6 @@
             transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* AUTO-HIDE CONTROLS BAR IN FULLSCREEN MODE (Zero Distraction) */
         .controls-bar.hidden-full {
             opacity: 0 !important;
             pointer-events: none !important;
@@ -237,10 +240,10 @@
         <!-- Hidden Video Input -->
         <video id="webcam-video" playsinline></video>
 
-        <!-- Layer 1: Background Video Only (Gets Soft Blur) -->
+        <!-- Layer 1: Background Video Only (HD Retina Scaled + Soft Blur) -->
         <canvas id="bg-canvas"></canvas>
 
-        <!-- Layer 2: Foreground Overlay (Emojis, Photos, Skeleton - ALWAYS 100% SHARP) -->
+        <!-- Layer 2: Foreground Overlay (Emojis, Photos, Skeleton - ALWAYS 100% SHARP HD) -->
         <canvas id="fg-canvas"></canvas>
 
         <!-- Top Header Status Badge -->
@@ -296,19 +299,29 @@
         let glitterParticles = [];
 
         // ----------------------------------------------------
+        // Retina High-DPI Canvas Resolution Scaler
+        // ----------------------------------------------------
+        function updateCanvasDimensions() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            bgCanvas.width = fgCanvas.width = Math.round(window.innerWidth * dpr);
+            bgCanvas.height = fgCanvas.height = Math.round(window.innerHeight * dpr);
+        }
+        updateCanvasDimensions();
+
+        // ----------------------------------------------------
         // Generate SVG Emoji Canvases for Crisp High-Res Rendering
         // ----------------------------------------------------
         const emojiCanvases = [];
 
         function createEmojiCanvas(char) {
             const cvs = document.createElement('canvas');
-            cvs.width = 140;
-            cvs.height = 140;
+            cvs.width = 160;
+            cvs.height = 160;
             const ctx = cvs.getContext('2d');
-            ctx.font = '95px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+            ctx.font = '110px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(char, 70, 75);
+            ctx.fillText(char, 80, 85);
             return cvs;
         }
 
@@ -317,11 +330,11 @@
         });
 
         // ----------------------------------------------------
-        // Aspect-Ratio Preserving Cover Draw (Natural Proportions)
+        // Aspect-Ratio Preserving Cover Draw (Natural Proportions HD)
         // ----------------------------------------------------
         function drawImageCover(ctx, img, w, h) {
-            const imgWidth = img.width || 640;
-            const imgHeight = img.height || 480;
+            const imgWidth = img.width || 1280;
+            const imgHeight = img.height || 720;
             const imgRatio = imgWidth / imgHeight;
             const canvasRatio = w / h;
             let renderW, renderH, offsetX, offsetY;
@@ -350,8 +363,8 @@
                 const totalAssets = [...emojiCanvases, ...loadedPhotoCanvas];
                 this.canvasAsset = totalAssets[Math.floor(Math.random() * totalAssets.length)];
                 
-                const minSz = Math.max(65, Math.floor(h * 0.11));
-                const maxSz = Math.max(120, Math.floor(h * 0.18));
+                const minSz = Math.max(75, Math.floor(h * 0.11));
+                const maxSz = Math.max(140, Math.floor(h * 0.18));
                 this.size = Math.floor(Math.random() * (maxSz - minSz)) + minSz;
                 
                 let candX = Math.random() * (w - this.size);
@@ -396,11 +409,11 @@
         function initGlitter(w, h) {
             glitterParticles = [];
             const colors = ['#ffffff', '#ffb6c1', '#ffe4e1', '#ffd700', '#e6e6fa'];
-            for (let i = 0; i < 40; i++) {
+            for (let i = 0; i < 45; i++) {
                 glitterParticles.push({
                     x: Math.random() * w,
                     y: Math.random() * h,
-                    size: Math.random() * 3 + 2,
+                    size: Math.random() * 3.5 + 2,
                     color: colors[Math.floor(Math.random() * colors.length)],
                     phase: Math.random() * Math.PI * 2,
                     speed: Math.random() * 0.15 + 0.08,
@@ -423,7 +436,7 @@
                 ctx.globalAlpha = alpha;
                 ctx.fillStyle = p.color;
                 ctx.strokeStyle = p.color;
-                ctx.lineWidth = 1.2;
+                ctx.lineWidth = 1.4;
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -462,8 +475,8 @@
                 setTimeout(() => loaderScreen.style.visibility = 'hidden', 500);
             }
 
-            const w = bgCanvas.width = fgCanvas.width = window.innerWidth;
-            const h = bgCanvas.height = fgCanvas.height = window.innerHeight;
+            const w = bgCanvas.width;
+            const h = bgCanvas.height;
 
             if (glitterParticles.length === 0) {
                 initGlitter(w, h);
@@ -502,10 +515,10 @@
             bgCtx.clearRect(0, 0, w, h);
             fgCtx.clearRect(0, 0, w, h);
 
-            // 1. LAYER 1: Render Video Background (Gets Soft Blur)
+            // 1. LAYER 1: Render Crisp HD Video Background
             drawImageCover(bgCtx, results.image, w, h);
 
-            // 2. LAYER 2: Render Emojis, Photos, Glitter & Hand Skeleton on Foreground (100% SHARP)
+            // 2. LAYER 2: Render Emojis, Photos, Glitter & Hand Skeleton on Foreground (100% SHARP HD)
             if (isVGestureActive) {
                 const spawnCount = Math.floor(Math.random() * 2) + 2;
                 for (let i = 0; i < spawnCount; i++) {
@@ -525,7 +538,7 @@
                 activeFloatingItems = [];
             }
 
-            // 3. Draw 21 Landmark Hand Tracking Skeleton & Dots on Foreground (100% SHARP)
+            // 3. Draw 21 Landmark Hand Tracking Skeleton & Dots on Foreground (100% SHARP HD)
             if (results.multiHandLandmarks) {
                 for (const landmarks of results.multiHandLandmarks) {
                     drawConnectors(fgCtx, landmarks, HAND_CONNECTIONS, { color: '#00ffff', lineWidth: 3 });
@@ -550,7 +563,7 @@
 
         hands.onResults(onResults);
 
-        // Start Mobile Camera Stream (Optimized 640x480 for 60 FPS)
+        // Start Mobile Camera Stream (Sharp 1280x720 HD Quality with fallback)
         function startCamera(facing) {
             if (camera) {
                 camera.stop();
@@ -559,8 +572,8 @@
                 onFrame: async () => {
                     await hands.send({ image: videoElement });
                 },
-                width: 640,
-                height: 480,
+                width: 1280,
+                height: 720,
                 facingMode: facing
             });
             camera.start();
@@ -629,15 +642,15 @@
                     const img = new Image();
                     img.onload = function() {
                         const cvs = document.createElement('canvas');
-                        cvs.width = 160;
-                        cvs.height = 160;
+                        cvs.width = 180;
+                        cvs.height = 180;
                         const ctx = cvs.getContext('2d');
 
                         ctx.beginPath();
-                        ctx.arc(80, 80, 70, 0, Math.PI * 2);
+                        ctx.arc(90, 90, 80, 0, Math.PI * 2);
                         ctx.clip();
 
-                        ctx.drawImage(img, 0, 0, 160, 160);
+                        ctx.drawImage(img, 0, 0, 180, 180);
 
                         ctx.lineWidth = 8;
                         ctx.strokeStyle = '#ff69b4';
@@ -658,8 +671,7 @@
 
         // Window Resize Handler
         window.addEventListener('resize', () => {
-            bgCanvas.width = fgCanvas.width = window.innerWidth;
-            bgCanvas.height = fgCanvas.height = window.innerHeight;
+            updateCanvasDimensions();
             initGlitter(bgCanvas.width, bgCanvas.height);
         });
     </script>
