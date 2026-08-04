@@ -297,25 +297,26 @@
         const loadedPhotoCanvas = [];
         let activeFloatingItems = [];
         let glitterParticles = [];
+        let spawnColumnIndex = 0; // Index counter for even horizontal distribution
 
         // Create Default Photo Avatar Canvas
         function createDefaultPhotoCanvas() {
             const cvs = document.createElement('canvas');
-            cvs.width = 160;
-            cvs.height = 160;
+            cvs.width = 200;
+            cvs.height = 200;
             const ctx = cvs.getContext('2d');
 
             ctx.beginPath();
-            ctx.arc(80, 80, 70, 0, Math.PI * 2);
+            ctx.arc(100, 100, 88, 0, Math.PI * 2);
             ctx.fillStyle = '#ff69b4';
             ctx.fill();
 
-            ctx.font = '80px sans-serif';
+            ctx.font = '100px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('📸', 80, 85);
+            ctx.fillText('📸', 100, 105);
 
-            ctx.lineWidth = 8;
+            ctx.lineWidth = 10;
             ctx.strokeStyle = '#ffd700';
             ctx.stroke();
 
@@ -325,7 +326,7 @@
         loadedPhotoCanvas.push(createDefaultPhotoCanvas());
 
         // ----------------------------------------------------
-        // Retina High-DPI Canvas Resolution Scaler (Matches Device Max Pixels)
+        // Retina High-DPI Canvas Resolution Scaler
         // ----------------------------------------------------
         function updateCanvasDimensions() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -335,19 +336,19 @@
         updateCanvasDimensions();
 
         // ----------------------------------------------------
-        // Generate SVG Emoji Canvases for Crisp High-Res Rendering
+        // Generate SVG Emoji Canvases for Crisp High-Res Rendering (BIGGER 200px)
         // ----------------------------------------------------
         const emojiCanvases = [];
 
         function createEmojiCanvas(char) {
             const cvs = document.createElement('canvas');
-            cvs.width = 160;
-            cvs.height = 160;
+            cvs.width = 200;
+            cvs.height = 200;
             const ctx = cvs.getContext('2d');
-            ctx.font = '110px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+            ctx.font = '140px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(char, 80, 85);
+            ctx.fillText(char, 100, 105);
             return cvs;
         }
 
@@ -356,7 +357,7 @@
         });
 
         // ----------------------------------------------------
-        // Aspect-Ratio Preserving Cover Draw (Native Resolution HD)
+        // Aspect-Ratio Preserving Cover Draw
         // ----------------------------------------------------
         function drawImageCover(ctx, img, w, h) {
             const imgWidth = img.videoWidth || img.width || 1920;
@@ -382,10 +383,10 @@
         }
 
         // ----------------------------------------------------
-        // Floating Item Engine (Emojis & User Photos 50/50 Spawn Mix)
+        // Floating Item Engine (BIGGER SIZE & 100% START FROM BOTTOM EVENLY SPACED)
         // ----------------------------------------------------
         class FloatingItem {
-            constructor(w, h, handX, handY) {
+            constructor(w, h) {
                 let selectedAsset;
                 if (loadedPhotoCanvas.length > 0 && Math.random() < 0.5) {
                     selectedAsset = loadedPhotoCanvas[Math.floor(Math.random() * loadedPhotoCanvas.length)];
@@ -395,29 +396,29 @@
 
                 this.canvasAsset = selectedAsset;
                 
-                const minSz = Math.max(75, Math.floor(h * 0.11));
-                const maxSz = Math.max(140, Math.floor(h * 0.18));
+                // BIGGER STICKER SIZE FOR MOBILE (h * 0.18 to h * 0.28)
+                const minSz = Math.max(140, Math.floor(h * 0.18));
+                const maxSz = Math.max(230, Math.floor(h * 0.28));
                 this.size = Math.floor(Math.random() * (maxSz - minSz)) + minSz;
                 
-                let candX = Math.random() * (w - this.size);
-                let candY = h + Math.random() * 30;
+                // 100% START FROM THE BOTTOM OF THE SCREEN
+                this.y = h + Math.random() * 60 + 10;
 
-                if (Math.random() < 0.6 && handX && handY) {
-                    const spreadW = w * 0.35;
-                    candX = (1.0 - handX) * w + (Math.random() * spreadW - spreadW / 2);
-                    candY = handY * h + (Math.random() * 80 - 20);
-                }
+                // EVEN HORIZONTAL DISTRIBUTION (UNIFORM COLUMNS)
+                const numCols = 5;
+                const colWidth = Math.max(10, (w - this.size) / numCols);
+                const col = (spawnColumnIndex++) % numCols;
+                const colX = col * colWidth + Math.random() * (colWidth * 0.7);
 
-                this.x = Math.max(10, Math.min(w - this.size - 10, candX));
+                this.x = Math.max(10, Math.min(w - this.size - 10, colX));
                 this.baseX = this.x;
-                this.y = candY;
 
-                // ULTRA FAST RISING SPEED (15.0 - 28.0 px/frame)
-                this.speedY = Math.random() * 13.0 + 15.0;
-                this.amplitudeX = Math.random() * 30 + 15;
+                // ULTRA FAST RISING SPEED (16.0 - 28.0 px/frame)
+                this.speedY = Math.random() * 12.0 + 16.0;
+                this.amplitudeX = Math.random() * 35 + 20;
                 this.frequencyX = Math.random() * 0.05 + 0.04;
                 this.phaseX = Math.random() * Math.PI * 2;
-                this.rotation = (Math.random() - 0.5) * 0.3;
+                this.rotation = (Math.random() - 0.5) * 0.35;
             }
 
             update() {
@@ -554,8 +555,8 @@
             if (isVGestureActive) {
                 const spawnCount = Math.floor(Math.random() * 2) + 2;
                 for (let i = 0; i < spawnCount; i++) {
-                    if (activeFloatingItems.length < 28) {
-                        activeFloatingItems.push(new FloatingItem(w, h, handCenterX, handCenterY));
+                    if (activeFloatingItems.length < 24) {
+                        activeFloatingItems.push(new FloatingItem(w, h));
                     }
                 }
 
@@ -564,7 +565,7 @@
                     item.draw(fgCtx);
                 });
 
-                activeFloatingItems = activeFloatingItems.filter(item => item.y > -item.size - 20);
+                activeFloatingItems = activeFloatingItems.filter(item => item.y > -item.size - 30);
                 drawGlitter(fgCtx, w, h);
             } else {
                 activeFloatingItems = [];
@@ -604,7 +605,7 @@
                 onFrame: async () => {
                     await hands.send({ image: videoElement });
                 },
-                width: 1920,   // Requests Native 1080p Full HD / 4K Max Sensor Pixels
+                width: 1920,
                 height: 1080,
                 facingMode: facing
             });
@@ -674,25 +675,25 @@
                     const img = new Image();
                     img.onload = function() {
                         const cvs = document.createElement('canvas');
-                        cvs.width = 180;
-                        cvs.height = 180;
+                        cvs.width = 220;
+                        cvs.height = 220;
                         const ctx = cvs.getContext('2d');
 
                         ctx.beginPath();
-                        ctx.arc(90, 90, 80, 0, Math.PI * 2);
+                        ctx.arc(110, 110, 95, 0, Math.PI * 2);
                         ctx.clip();
 
-                        ctx.drawImage(img, 0, 0, 180, 180);
+                        ctx.drawImage(img, 0, 0, 220, 220);
 
-                        ctx.lineWidth = 10;
+                        ctx.lineWidth = 12;
                         ctx.strokeStyle = '#ff69b4';
                         ctx.stroke();
 
-                        ctx.lineWidth = 4;
+                        ctx.lineWidth = 5;
                         ctx.strokeStyle = '#ffd700';
                         ctx.stroke();
 
-                        for (let k = 0; k < 5; k++) {
+                        for (let k = 0; k < 6; k++) {
                             loadedPhotoCanvas.push(cvs);
                         }
                         alert('Foto kamu berhasil ditambahkan dan akan muncul melayang di layar! 📸💕');
