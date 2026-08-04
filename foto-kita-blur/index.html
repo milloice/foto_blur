@@ -2,7 +2,14 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA & Mobile Web App Standalone Meta Tags (Hides Address Bar Completely) -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0d0614">
+
     <title>Fotoblur - Hand Tracking V-Gesture Love Effect ✌️💕</title>
     
     <!-- Google Fonts -->
@@ -26,8 +33,9 @@
         }
 
         body, html {
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh; /* Modern Mobile Dynamic Viewport Height */
             overflow: hidden;
             background-color: #0d0614;
             font-family: 'Outfit', 'Inter', sans-serif;
@@ -38,6 +46,7 @@
             position: relative;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -63,14 +72,14 @@
         /* Glassmorphic UI Header Badge */
         .ui-header {
             position: absolute;
-            top: 24px;
+            top: env(safe-area-inset-top, 24px);
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 24px;
+            padding: 10px 20px;
             background: rgba(20, 10, 30, 0.65);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
@@ -102,7 +111,7 @@
         }
 
         .status-text {
-            font-size: 1.05rem;
+            font-size: 0.95rem;
             font-weight: 700;
             letter-spacing: 0.5px;
             white-space: nowrap;
@@ -110,42 +119,44 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        /* Floating Action Controls */
+        /* Floating Action Controls Bar */
         .controls-bar {
             position: absolute;
-            bottom: 24px;
+            bottom: max(20px, env(safe-area-inset-bottom, 20px));
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
             display: flex;
-            gap: 12px;
-            padding: 10px 16px;
-            background: rgba(15, 8, 25, 0.7);
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(15, 8, 25, 0.75);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.18);
             border-radius: 30px;
+            max-width: 95vw;
         }
 
         .control-btn {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 10px 16px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            gap: 5px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.22);
             border-radius: 20px;
             color: white;
             font-family: inherit;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
+            white-space: nowrap;
             transition: all 0.2s ease;
         }
 
         .control-btn:hover, .control-btn:active {
-            background: rgba(255, 105, 180, 0.3);
-            border-color: rgba(255, 105, 180, 0.6);
+            background: rgba(255, 105, 180, 0.35);
+            border-color: rgba(255, 105, 180, 0.7);
             transform: translateY(-2px);
         }
 
@@ -210,7 +221,8 @@
 
         <!-- Bottom Controls -->
         <div class="controls-bar">
-            <button class="control-btn" id="flip-cam-btn">🔄 Switch Camera</button>
+            <button class="control-btn" id="fullscreen-btn">🔲 Fullscreen</button>
+            <button class="control-btn" id="flip-cam-btn">🔄 Camera</button>
             <button class="control-btn" id="upload-photo-btn">📸 Add Photo</button>
             <input type="file" id="file-input" accept="image/*">
         </div>
@@ -233,6 +245,7 @@
         const statusBadge = document.getElementById('status-badge');
         const statusText = document.getElementById('status-text');
         const loaderScreen = document.getElementById('loader-screen');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
         const flipCamBtn = document.getElementById('flip-cam-btn');
         const uploadPhotoBtn = document.getElementById('upload-photo-btn');
         const fileInput = document.getElementById('file-input');
@@ -297,28 +310,36 @@
         }
 
         // ----------------------------------------------------
-        // Floating Item Engine (Emojis & Photos)
+        // Floating Item Engine (Spaced Out & High Speed)
         // ----------------------------------------------------
         class FloatingItem {
-            constructor(w, h, handX, handY) {
+            constructor(w, h, handX, handY, existingItems) {
                 const totalAssets = [...emojiCanvases, ...loadedPhotoCanvas];
                 this.canvasAsset = totalAssets[Math.floor(Math.random() * totalAssets.length)];
                 
-                // Enlarged size: 90px to 160px
-                this.size = Math.floor(Math.random() * 70) + 90;
+                // Dynamic Mobile Sticker Scaling
+                const minSz = Math.max(70, Math.floor(h * 0.12));
+                const maxSz = Math.max(130, Math.floor(h * 0.20));
+                this.size = Math.floor(Math.random() * (maxSz - minSz)) + minSz;
                 
-                if (Math.random() < 0.65 && handX && handY) {
-                    this.x = (1.0 - handX) * w + (Math.random() * 320 - 160);
-                    this.y = handY * h + (Math.random() * 120 - 40);
-                } else {
-                    this.x = Math.random() * (w - this.size);
-                    this.y = h + Math.random() * 50;
+                // Try finding a well-spaced X, Y spawn location
+                let candX = Math.random() * (w - this.size);
+                let candY = h + Math.random() * 40;
+
+                if (Math.random() < 0.6 && handX && handY) {
+                    const spreadW = w * 0.3;
+                    candX = (1.0 - handX) * w + (Math.random() * spreadW - spreadW / 2);
+                    candY = handY * h + (Math.random() * 80 - 20);
                 }
 
+                this.x = Math.max(10, Math.min(w - this.size - 10, candX));
                 this.baseX = this.x;
-                this.speedY = Math.random() * 8.0 + 7.0; // FAST RISING SPEED (7-15 px/frame)
+                this.y = candY;
+
+                // HIGH UPWARD SPEED (14.0 - 26.0 px/frame)
+                this.speedY = Math.random() * 12.0 + 14.0;
                 this.amplitudeX = Math.random() * 35 + 15;
-                this.frequencyX = Math.random() * 0.05 + 0.03;
+                this.frequencyX = Math.random() * 0.05 + 0.04;
                 this.phaseX = Math.random() * Math.PI * 2;
                 this.rotation = (Math.random() - 0.5) * 0.4;
             }
@@ -388,7 +409,7 @@
         }
 
         // ----------------------------------------------------
-        // MediaPipe Hands Landmark Processing & V-Gesture Check
+        // MediaPipe Hands Landmark Processing & Fast Responsive V Check
         // ----------------------------------------------------
         function checkVGesture(landmarks) {
             const indexUp = landmarks[8].y < landmarks[6].y && landmarks[8].y < landmarks[5].y;
@@ -401,7 +422,7 @@
             const dy = landmarks[8].y - landmarks[12].y;
             const tipDist = Math.hypot(dx, dy);
 
-            return indexUp && middleUp && ringDown && pinkyDown && tipDist > 0.035;
+            return indexUp && middleUp && ringDown && pinkyDown && tipDist > 0.03;
         }
 
         function onResults(results) {
@@ -444,13 +465,14 @@
                 statusText.innerText = '✌️ Show V Gesture';
             }
 
+            // Zero-Delay Fast Blur Transition
             const targetBlur = isVGestureActive ? 1.0 : 0.0;
-            blurFactor += (targetBlur - blurFactor) * 0.25;
+            blurFactor += (targetBlur - blurFactor) * 0.45;
 
             canvasCtx.clearRect(0, 0, w, h);
 
             // ----------------------------------------------------
-            // 1. Render Video Frame (Natural Proportions Cover Draw)
+            // 1. Render Video Frame (Natural Aspect Ratio Cover)
             // ----------------------------------------------------
             if (blurFactor > 0.01) {
                 canvasCtx.save();
@@ -462,13 +484,13 @@
             }
 
             // ----------------------------------------------------
-            // 2. Render Fast Flying Emojis & Photos (ONLY during V Gesture)
+            // 2. Render Fast Floating Emojis & Photos (Spaced Out)
             // ----------------------------------------------------
             if (isVGestureActive) {
                 const spawnCount = Math.floor(Math.random() * 3) + 3;
                 for (let i = 0; i < spawnCount; i++) {
                     if (activeFloatingItems.length < 45) {
-                        activeFloatingItems.push(new FloatingItem(w, h, handCenterX, handCenterY));
+                        activeFloatingItems.push(new FloatingItem(w, h, handCenterX, handCenterY, activeFloatingItems));
                     }
                 }
 
@@ -504,8 +526,8 @@
         hands.setOptions({
             maxNumHands: 2,
             modelComplexity: 1,
-            minDetectionConfidence: 0.6,
-            minTrackingConfidence: 0.6
+            minDetectionConfidence: 0.55,
+            minTrackingConfidence: 0.55
         });
 
         hands.onResults(onResults);
@@ -529,8 +551,27 @@
         startCamera(facingMode);
 
         // ----------------------------------------------------
-        // User Controls (Switch Camera & Upload Photo)
+        // User Controls (Fullscreen, Switch Camera, & Upload Photo)
         // ----------------------------------------------------
+        fullscreenBtn.addEventListener('click', () => {
+            const docEl = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (docEl.requestFullscreen) {
+                    docEl.requestFullscreen();
+                } else if (docEl.webkitRequestFullscreen) {
+                    docEl.webkitRequestFullscreen();
+                }
+                fullscreenBtn.innerText = '📉 Exit Full';
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+                fullscreenBtn.innerText = '🔲 Fullscreen';
+            }
+        });
+
         flipCamBtn.addEventListener('click', () => {
             facingMode = (facingMode === 'user') ? 'environment' : 'user';
             startCamera(facingMode);
@@ -554,7 +595,6 @@
 
                         ctx.beginPath();
                         ctx.arc(90, 90, 80, 0, Math.PI * 2);
-                        ctx.closePath();
                         ctx.clip();
 
                         ctx.drawImage(img, 0, 0, 180, 180);

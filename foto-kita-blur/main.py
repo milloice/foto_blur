@@ -56,12 +56,12 @@ HAND_CONNECTIONS = [
 
 
 # ----------------------------------------------------
-# Neural Network Hand Tracker (Google MediaPipe 21 Landmarks)
+# Neural Network Hand Tracker (Google MediaPipe 21 Landmarks - Fast Responsive)
 # ----------------------------------------------------
 class HandTracker:
     def __init__(self):
         self.gesture_history = []
-        self.history_size = 5
+        self.history_size = 2  # Reduced to 2 frames for INSTANT zero-delay response
         self.detector = None
 
         if MP_TASKS_AVAILABLE and os.path.exists(MODEL_PATH):
@@ -70,12 +70,12 @@ class HandTracker:
                 options = vision.HandLandmarkerOptions(
                     base_options=base_options,
                     num_hands=2,
-                    min_hand_detection_confidence=0.6,
-                    min_hand_presence_confidence=0.6,
-                    min_tracking_confidence=0.6
+                    min_hand_detection_confidence=0.5,
+                    min_hand_presence_confidence=0.5,
+                    min_tracking_confidence=0.5
                 )
                 self.detector = vision.HandLandmarker.create_from_options(options)
-                print("HandTracker initialized with Google MediaPipe Neural Network (21 3D Landmarks).")
+                print("HandTracker initialized (Instant Low-Latency Mode).")
             except Exception as e:
                 print(f"HandLandmarker init error: {e}")
 
@@ -104,12 +104,12 @@ class HandTracker:
                     hand_x = int(hand_lms[0].x * w)
                     hand_y = int(hand_lms[0].y * h)
 
-        # Smooth detection history
+        # Smooth detection history (Fast threshold for immediate trigger)
         self.gesture_history.append(v_detected)
         if len(self.gesture_history) > self.history_size:
             self.gesture_history.pop(0)
 
-        is_v_stable = sum(self.gesture_history) >= (self.history_size // 2)
+        is_v_stable = sum(self.gesture_history) >= 1
         return is_v_stable, hand_x, hand_y, all_hand_landmarks
 
     def check_v_gesture_mp(self, lms):
@@ -123,7 +123,7 @@ class HandTracker:
         dy = lms[8].y - lms[12].y
         tip_dist = math.hypot(dx, dy)
 
-        return index_up and middle_up and ring_down and pinky_down and tip_dist > 0.035
+        return index_up and middle_up and ring_down and pinky_down and tip_dist > 0.03
 
     def draw_hand_landmarks(self, frame_bgr, all_hand_landmarks):
         if not all_hand_landmarks:
@@ -151,10 +151,10 @@ class HandTracker:
 
 
 # ----------------------------------------------------
-# Emoji & User Photo Floating Manager (Enlarged & Moving)
+# Emoji & User Photo Floating Manager (Spaced Out & High Speed)
 # ----------------------------------------------------
 class FloatingAssetManager:
-    def __init__(self, emoji_dir, photos_dir, max_items=40):
+    def __init__(self, emoji_dir, photos_dir, max_items=50):
         self.emoji_dir = emoji_dir
         self.photos_dir = photos_dir
         self.max_items = max_items
@@ -181,7 +181,6 @@ class FloatingAssetManager:
             if p_img is not None:
                 formatted_photo = self.format_user_photo(p_img)
                 if formatted_photo is not None:
-                    # Add multiple copies of user photo so it shows up frequently
                     for _ in range(3):
                         self.asset_pool.append(formatted_photo)
 
@@ -214,33 +213,62 @@ class FloatingAssetManager:
         res_np = cv2.cvtColor(np.array(output), cv2.COLOR_RGBA2BGRA)
         return res_np
 
+    def is_too_close(self, candidate_x, candidate_y, candidate_size):
+        """Ensures distinct spatial spacing between spawned items so they don't overlap tightly."""
+        min_dist = candidate_size * 0.85
+        for item in self.active_items:
+            dx = item["x"] - candidate_x
+            dy = item["y"] - candidate_y
+            if math.hypot(dx, dy) < min_dist:
+                return True
+        return False
+
     def spawn_item(self, hand_x, hand_y, screen_w, screen_h):
         if not self.asset_pool or len(self.active_items) >= self.max_items:
             return
 
         img = random.choice(self.asset_pool)
-        # ENLARGED SIZE RANGE: 90px to 160px
-        size = random.randint(90, 160)
+
+        # DYNAMIC MOBILE STICKER SCALING
+        min_sz = max(70, int(screen_h * 0.13))
+        max_sz = max(135, int(screen_h * 0.22))
+        size = random.randint(min_sz, max_sz)
+
+        # Try finding a well-spaced X, Y spawn location
+        spawn_success = False
+        x, y = 0, 0
+        for _ in range(6):  # Attempt up to 6 spatial checks
+            if random.random() < 0.6 and hand_x > 0 and hand_y > 0:
+                spread_w = int(screen_w * 0.35)
+                cand_x = hand_x + random.randint(-spread_w, spread_w)
+                cand_y = hand_y + random.randint(-20, 90)
+            else:
+                cand_x = random.randint(20, max(21, screen_w - size - 20))
+                cand_y = screen_h + random.randint(0, 50)
+
+            cand_x = max(10, min(screen_w - size - 10, cand_x))
+
+            if not self.is_too_close(cand_x, cand_y, size):
+                x, y = cand_x, cand_y
+                spawn_success = True
+                break
+
+        if not spawn_success:
+            x = random.randint(15, max(16, screen_w - size - 15))
+            y = screen_h + random.randint(0, 60)
+
         resized = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
 
-        if random.random() < 0.7 and hand_x > 0 and hand_y > 0:
-            x = hand_x + random.randint(-160, 160)
-            y = hand_y + random.randint(-40, 80)
-        else:
-            x = random.randint(20, max(21, screen_w - size - 20))
-            y = screen_h + random.randint(0, 30)
-
-        x = max(10, min(screen_w - size - 10, x))
-
+        # INCREASED UPWARD SPEED (14.0 to 26.0 px/frame for fast lively movement)
         self.active_items.append({
             "image": resized,
             "x": float(x),
             "base_x": float(x),
             "y": float(y),
             "size": size,
-            "speed_y": random.uniform(7.0, 15.0),
-            "amplitude_x": random.uniform(20, 50),
-            "frequency_x": random.uniform(0.03, 0.08),
+            "speed_y": random.uniform(14.0, 26.0),
+            "amplitude_x": random.uniform(15, 45),
+            "frequency_x": random.uniform(0.04, 0.09),
             "phase_x": random.uniform(0, 2 * math.pi)
         })
 
@@ -248,15 +276,14 @@ class FloatingAssetManager:
         if not self.asset_pool:
             return frame_bgr
 
-        # Clear ALL floating items instantly when V gesture is not active
         if not v_gesture_active:
             self.active_items = []
             return frame_bgr
 
         screen_h, screen_w = frame_bgr.shape[0], frame_bgr.shape[1]
 
-        # Spawn new items instantly and rapidly when V gesture is active
-        for _ in range(random.randint(3, 6)):
+        # Spawn new well-spaced items rapidly
+        for _ in range(random.randint(3, 5)):
             self.spawn_item(hand_x, hand_y, screen_w, screen_h)
 
         remaining_items = []
@@ -348,19 +375,18 @@ class GlitterEffect:
 
 
 # ----------------------------------------------------
-# Simplified & Sleek Top UI Header
+# Responsive Glassmorphic UI Badge
 # ----------------------------------------------------
 def draw_ui_banner(frame_bgr, is_v_active):
     h, w = frame_bgr.shape[:2]
 
-    # Minimal floating top-center pill badge
-    badge_w, badge_h = 320, 46
+    badge_w = min(360, int(w * 0.75))
+    badge_h = 44
     bx1 = (w - badge_w) // 2
-    by1 = 20
+    by1 = 18
     bx2 = bx1 + badge_w
     by2 = by1 + badge_h
 
-    # Glassmorphic rounded rectangle badge
     badge_crop = frame_bgr[by1:by2, bx1:bx2].copy()
     overlay_col = (40, 10, 70) if is_v_active else (20, 20, 20)
     cv2.rectangle(badge_crop, (0, 0), (badge_w, badge_h), overlay_col, -1)
@@ -369,13 +395,12 @@ def draw_ui_banner(frame_bgr, is_v_active):
     border_col = (255, 105, 180) if is_v_active else (150, 150, 150)
     cv2.rectangle(frame_bgr, (bx1, by1), (bx2, by2), border_col, 2)
 
-    # Render simple text via PIL
     img_pil = Image.fromarray(cv2.cvtColor(frame_bgr[by1:by2, bx1:bx2], cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(img_pil)
 
     font_path = "C:\\Windows\\Fonts\\seguiemj.ttf"
     try:
-        font = ImageFont.truetype(font_path, 22)
+        font = ImageFont.truetype(font_path, 20)
     except:
         font = ImageFont.load_default()
 
@@ -386,7 +411,6 @@ def draw_ui_banner(frame_bgr, is_v_active):
         text = "✌️ Show V Gesture"
         text_color = (255, 255, 255)
 
-    # Center text in badge
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     tx = (badge_w - tw) // 2
@@ -400,7 +424,7 @@ def draw_ui_banner(frame_bgr, is_v_active):
 # Main Program Loop
 # ----------------------------------------------------
 def main():
-    print("Initializing Hand Tracking V-Gesture Program...")
+    print("Initializing Hand Tracking V-Gesture Program (High Speed & Zero Latency Mode)...")
 
     cap = None
     for cam_idx in [0, 1, 2]:
@@ -419,7 +443,7 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     tracker = HandTracker()
-    assets_mgr = FloatingAssetManager(EMOJI_DIR, PHOTOS_DIR, max_items=45)
+    assets_mgr = FloatingAssetManager(EMOJI_DIR, PHOTOS_DIR, max_items=50)
     glitter = GlitterEffect(num_particles=65)
 
     win_name = "Fotoblur - V Gesture Love Effect"
@@ -438,19 +462,23 @@ def main():
             print("Failed to grab webcam frame.")
             break
 
-        frame = cv2.flip(frame, 1)
         h, w = frame.shape[:2]
+        if h > w:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            h, w = frame.shape[:2]
 
-        # Process hand tracking & gesture detection using 21 MediaPipe Neural Network Landmarks
+        frame = cv2.flip(frame, 1)
+
+        # Process hand tracking & gesture detection with INSTANT LOW-LATENCY
         is_v_gesture, hand_x, hand_y, all_landmarks = tracker.process(frame)
 
-        # Smooth hand position tracking
-        smooth_hand_x += (hand_x - smooth_hand_x) * 0.3
-        smooth_hand_y += (hand_y - smooth_hand_y) * 0.3
+        # High-speed tracking responsiveness (0.75 lerp factor for instant hand tracking)
+        smooth_hand_x += (hand_x - smooth_hand_x) * 0.75
+        smooth_hand_y += (hand_y - smooth_hand_y) * 0.75
 
-        # Smooth blur factor transition (0.0 = clear, 1.0 = full blur)
+        # Instant blur onset (0.5 lerp factor)
         target_blur = 1.0 if is_v_gesture else 0.0
-        blur_factor += (target_blur - blur_factor) * 0.25
+        blur_factor += (target_blur - blur_factor) * 0.5
 
         # ----------------------------------------------------
         # 1. Full Camera Gaussian Blur when V-Gesture Active
@@ -460,7 +488,7 @@ def main():
             blurred_frame = cv2.GaussianBlur(frame, (k_size, k_size), 0)
             frame = cv2.addWeighted(blurred_frame, blur_factor, frame, 1.0 - blur_factor, 0)
 
-            # Render love emojis & user photos floating up (spawn ONLY during V-gesture)
+            # Render love emojis & user photos floating up
             frame = assets_mgr.update_and_render(frame, is_v_gesture, int(smooth_hand_x), int(smooth_hand_y))
 
             # Render glitter sparkles
@@ -471,10 +499,10 @@ def main():
         # ----------------------------------------------------
         tracker.draw_hand_landmarks(frame, all_landmarks)
 
-        # 3. Draw simplified top UI badge
+        # 3. Draw responsive top UI badge
         draw_ui_banner(frame, is_v_gesture)
 
-        # Show frame fullscreen
+        # Show frame in window
         cv2.imshow(win_name, frame)
 
         # Exit on 'Q' or ESC

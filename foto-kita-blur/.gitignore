@@ -1,7 +1,0 @@
-# Ignore photos folder to protect personal privacy
-photos/
-*.png
-*.jpg
-*.jpeg
-__pycache__/
-*.task
