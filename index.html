@@ -298,6 +298,34 @@
         let activeFloatingItems = [];
         let glitterParticles = [];
 
+        // Create Default Photo Avatar Canvas (Shown alongside emojis)
+        function createDefaultPhotoCanvas() {
+            const cvs = document.createElement('canvas');
+            cvs.width = 160;
+            cvs.height = 160;
+            const ctx = cvs.getContext('2d');
+
+            // Draw cute heart-framed photo avatar
+            ctx.beginPath();
+            ctx.arc(80, 80, 70, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff69b4';
+            ctx.fill();
+
+            ctx.font = '80px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('📸', 80, 85);
+
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#ffd700';
+            ctx.stroke();
+
+            return cvs;
+        }
+
+        // Add default photo to pool
+        loadedPhotoCanvas.push(createDefaultPhotoCanvas());
+
         // ----------------------------------------------------
         // Retina High-DPI Canvas Resolution Scaler
         // ----------------------------------------------------
@@ -356,12 +384,19 @@
         }
 
         // ----------------------------------------------------
-        // Floating Item Engine (100% Crisp & Sharp Overlay)
+        // Floating Item Engine (Emojis & User Photos 50/50 Spawn Mix)
         // ----------------------------------------------------
         class FloatingItem {
             constructor(w, h, handX, handY) {
-                const totalAssets = [...emojiCanvases, ...loadedPhotoCanvas];
-                this.canvasAsset = totalAssets[Math.floor(Math.random() * totalAssets.length)];
+                // 50% chance for user photo, 50% for emoji
+                let selectedAsset;
+                if (loadedPhotoCanvas.length > 0 && Math.random() < 0.5) {
+                    selectedAsset = loadedPhotoCanvas[Math.floor(Math.random() * loadedPhotoCanvas.length)];
+                } else {
+                    selectedAsset = emojiCanvases[Math.floor(Math.random() * emojiCanvases.length)];
+                }
+
+                this.canvasAsset = selectedAsset;
                 
                 const minSz = Math.max(75, Math.floor(h * 0.11));
                 const maxSz = Math.max(140, Math.floor(h * 0.18));
@@ -652,16 +687,19 @@
 
                         ctx.drawImage(img, 0, 0, 180, 180);
 
-                        ctx.lineWidth = 8;
+                        ctx.lineWidth = 10;
                         ctx.strokeStyle = '#ff69b4';
                         ctx.stroke();
 
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 4;
                         ctx.strokeStyle = '#ffd700';
                         ctx.stroke();
 
-                        loadedPhotoCanvas.push(cvs);
-                        alert('Foto kamu berhasil ditambahkan ke animasi love! 📸💕');
+                        // Add user photo multiple times to pool so it appears frequently!
+                        for (let k = 0; k < 5; k++) {
+                            loadedPhotoCanvas.push(cvs);
+                        }
+                        alert('Foto kamu berhasil ditambahkan dan akan muncul melayang di layar! 📸💕');
                     };
                     img.src = event.target.result;
                 };
