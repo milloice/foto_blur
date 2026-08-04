@@ -58,7 +58,7 @@
             display: none;
         }
 
-        /* Layer 1: Background Video Canvas (HD Retina Scaled + Soft Blur) */
+        /* Layer 1: Background Video Canvas (HD Native Max Scaled + Soft Blur) */
         #bg-canvas {
             position: absolute;
             top: 0;
@@ -78,7 +78,7 @@
             filter: blur(10px) brightness(0.92);
         }
 
-        /* Layer 2: Foreground Overlay Canvas (Retina High-DPI Sharp) */
+        /* Layer 2: Foreground Overlay Canvas (Retina Ultra-HD Sharp) */
         #fg-canvas {
             position: absolute;
             top: 0;
@@ -240,7 +240,7 @@
         <!-- Hidden Video Input -->
         <video id="webcam-video" playsinline></video>
 
-        <!-- Layer 1: Background Video Only (HD Retina Scaled + Soft Blur) -->
+        <!-- Layer 1: Background Video Only (HD Native Max Scaled + Soft Blur) -->
         <canvas id="bg-canvas"></canvas>
 
         <!-- Layer 2: Foreground Overlay (Emojis, Photos, Skeleton - ALWAYS 100% SHARP HD) -->
@@ -298,14 +298,13 @@
         let activeFloatingItems = [];
         let glitterParticles = [];
 
-        // Create Default Photo Avatar Canvas (Shown alongside emojis)
+        // Create Default Photo Avatar Canvas
         function createDefaultPhotoCanvas() {
             const cvs = document.createElement('canvas');
             cvs.width = 160;
             cvs.height = 160;
             const ctx = cvs.getContext('2d');
 
-            // Draw cute heart-framed photo avatar
             ctx.beginPath();
             ctx.arc(80, 80, 70, 0, Math.PI * 2);
             ctx.fillStyle = '#ff69b4';
@@ -323,14 +322,13 @@
             return cvs;
         }
 
-        // Add default photo to pool
         loadedPhotoCanvas.push(createDefaultPhotoCanvas());
 
         // ----------------------------------------------------
-        // Retina High-DPI Canvas Resolution Scaler
+        // Retina High-DPI Canvas Resolution Scaler (Matches Device Max Pixels)
         // ----------------------------------------------------
         function updateCanvasDimensions() {
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
             bgCanvas.width = fgCanvas.width = Math.round(window.innerWidth * dpr);
             bgCanvas.height = fgCanvas.height = Math.round(window.innerHeight * dpr);
         }
@@ -358,11 +356,11 @@
         });
 
         // ----------------------------------------------------
-        // Aspect-Ratio Preserving Cover Draw (Natural Proportions HD)
+        // Aspect-Ratio Preserving Cover Draw (Native Resolution HD)
         // ----------------------------------------------------
         function drawImageCover(ctx, img, w, h) {
-            const imgWidth = img.width || 1280;
-            const imgHeight = img.height || 720;
+            const imgWidth = img.videoWidth || img.width || 1920;
+            const imgHeight = img.videoHeight || img.height || 1080;
             const imgRatio = imgWidth / imgHeight;
             const canvasRatio = w / h;
             let renderW, renderH, offsetX, offsetY;
@@ -388,7 +386,6 @@
         // ----------------------------------------------------
         class FloatingItem {
             constructor(w, h, handX, handY) {
-                // 50% chance for user photo, 50% for emoji
                 let selectedAsset;
                 if (loadedPhotoCanvas.length > 0 && Math.random() < 0.5) {
                     selectedAsset = loadedPhotoCanvas[Math.floor(Math.random() * loadedPhotoCanvas.length)];
@@ -550,7 +547,7 @@
             bgCtx.clearRect(0, 0, w, h);
             fgCtx.clearRect(0, 0, w, h);
 
-            // 1. LAYER 1: Render Crisp HD Video Background
+            // 1. LAYER 1: Render Crisp HD Native Max Resolution Video Background
             drawImageCover(bgCtx, results.image, w, h);
 
             // 2. LAYER 2: Render Emojis, Photos, Glitter & Hand Skeleton on Foreground (100% SHARP HD)
@@ -598,7 +595,7 @@
 
         hands.onResults(onResults);
 
-        // Start Mobile Camera Stream (Sharp 1280x720 HD Quality with fallback)
+        // Start Camera Stream with NATIVE MAX CAMERA RESOLUTION REQUEST (4K / Full HD 1080p Ideal)
         function startCamera(facing) {
             if (camera) {
                 camera.stop();
@@ -607,8 +604,8 @@
                 onFrame: async () => {
                     await hands.send({ image: videoElement });
                 },
-                width: 1280,
-                height: 720,
+                width: 1920,   // Requests Native 1080p Full HD / 4K Max Sensor Pixels
+                height: 1080,
                 facingMode: facing
             });
             camera.start();
@@ -695,7 +692,6 @@
                         ctx.strokeStyle = '#ffd700';
                         ctx.stroke();
 
-                        // Add user photo multiple times to pool so it appears frequently!
                         for (let k = 0; k < 5; k++) {
                             loadedPhotoCanvas.push(cvs);
                         }
