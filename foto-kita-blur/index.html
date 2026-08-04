@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- PWA & Mobile Web App Standalone Meta Tags (Hides Address Bar Completely) -->
+    <!-- PWA & Mobile Web App Standalone Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -35,7 +35,7 @@
         body, html {
             width: 100vw;
             height: 100vh;
-            height: 100dvh; /* Modern Mobile Dynamic Viewport Height */
+            height: 100dvh;
             overflow: hidden;
             background-color: #0d0614;
             font-family: 'Outfit', 'Inter', sans-serif;
@@ -58,7 +58,7 @@
             display: none;
         }
 
-        /* Main Canvas Render Window */
+        /* Main Canvas Render Window (GPU Hardware Accelerated Blur) */
         #output-canvas {
             position: absolute;
             top: 0;
@@ -67,26 +67,32 @@
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1); /* Mirror feel */
+            transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: filter;
+        }
+
+        #output-canvas.blurred {
+            filter: blur(20px) brightness(0.85);
         }
 
         /* Glassmorphic UI Header Badge */
         .ui-header {
             position: absolute;
-            top: env(safe-area-inset-top, 24px);
+            top: env(safe-area-inset-top, 20px);
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
+            gap: 8px;
+            padding: 8px 18px;
             background: rgba(20, 10, 30, 0.65);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1.5px solid rgba(255, 255, 255, 0.18);
             border-radius: 40px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s ease;
         }
 
         .ui-header.active {
@@ -97,38 +103,37 @@
         }
 
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background-color: #aaa;
-            box-shadow: 0 0 8px #aaa;
+            box-shadow: 0 0 6px #aaa;
             transition: background-color 0.3s, box-shadow 0.3s;
         }
 
         .ui-header.active .status-dot {
             background-color: #ff2d75;
-            box-shadow: 0 0 12px #ff2d75, 0 0 20px #ff2d75;
+            box-shadow: 0 0 12px #ff2d75;
         }
 
         .status-text {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 700;
             letter-spacing: 0.5px;
             white-space: nowrap;
             color: #ffffff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
         /* Floating Action Controls Bar */
         .controls-bar {
             position: absolute;
-            bottom: max(20px, env(safe-area-inset-bottom, 20px));
+            bottom: max(16px, env(safe-area-inset-bottom, 16px));
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
             display: flex;
             gap: 8px;
-            padding: 8px 14px;
+            padding: 6px 12px;
             background: rgba(15, 8, 25, 0.75);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
@@ -179,8 +184,8 @@
         }
 
         .spinner {
-            width: 50px;
-            height: 50px;
+            width: 46px;
+            height: 46px;
             border: 4px solid rgba(255, 105, 180, 0.2);
             border-top: 4px solid #ff1493;
             border-radius: 50%;
@@ -193,7 +198,7 @@
         }
 
         .loader-title {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
             color: #ff69b4;
         }
@@ -253,7 +258,6 @@
         let camera = null;
         let facingMode = 'user'; // 'user' (selfie) or 'environment' (back camera)
         let isVGestureActive = false;
-        let blurFactor = 0.0; // 0.0 to 1.0 smooth transition
         let handCenterX = 0.5, handCenterY = 0.5;
 
         // Assets Pool (Emojis + Custom User Photos)
@@ -269,13 +273,13 @@
 
         function createEmojiCanvas(char) {
             const cvs = document.createElement('canvas');
-            cvs.width = 160;
-            cvs.height = 160;
+            cvs.width = 140;
+            cvs.height = 140;
             const ctx = cvs.getContext('2d');
-            ctx.font = '110px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+            ctx.font = '95px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(char, 80, 85);
+            ctx.fillText(char, 70, 75);
             return cvs;
         }
 
@@ -287,8 +291,8 @@
         // Aspect-Ratio Preserving Cover Draw (Natural Proportions)
         // ----------------------------------------------------
         function drawImageCover(ctx, img, w, h) {
-            const imgWidth = img.width || 1280;
-            const imgHeight = img.height || 720;
+            const imgWidth = img.width || 640;
+            const imgHeight = img.height || 480;
             const imgRatio = imgWidth / imgHeight;
             const canvasRatio = w / h;
             let renderW, renderH, offsetX, offsetY;
@@ -310,24 +314,23 @@
         }
 
         // ----------------------------------------------------
-        // Floating Item Engine (Spaced Out & High Speed)
+        // Floating Item Engine (Mobile GPU Optimized & Spaced Out)
         // ----------------------------------------------------
         class FloatingItem {
-            constructor(w, h, handX, handY, existingItems) {
+            constructor(w, h, handX, handY) {
                 const totalAssets = [...emojiCanvases, ...loadedPhotoCanvas];
                 this.canvasAsset = totalAssets[Math.floor(Math.random() * totalAssets.length)];
                 
-                // Dynamic Mobile Sticker Scaling
-                const minSz = Math.max(70, Math.floor(h * 0.12));
-                const maxSz = Math.max(130, Math.floor(h * 0.20));
+                // Optimized Mobile Sticker Scaling
+                const minSz = Math.max(65, Math.floor(h * 0.11));
+                const maxSz = Math.max(120, Math.floor(h * 0.18));
                 this.size = Math.floor(Math.random() * (maxSz - minSz)) + minSz;
                 
-                // Try finding a well-spaced X, Y spawn location
                 let candX = Math.random() * (w - this.size);
-                let candY = h + Math.random() * 40;
+                let candY = h + Math.random() * 30;
 
                 if (Math.random() < 0.6 && handX && handY) {
-                    const spreadW = w * 0.3;
+                    const spreadW = w * 0.35;
                     candX = (1.0 - handX) * w + (Math.random() * spreadW - spreadW / 2);
                     candY = handY * h + (Math.random() * 80 - 20);
                 }
@@ -336,12 +339,12 @@
                 this.baseX = this.x;
                 this.y = candY;
 
-                // HIGH UPWARD SPEED (14.0 - 26.0 px/frame)
-                this.speedY = Math.random() * 12.0 + 14.0;
-                this.amplitudeX = Math.random() * 35 + 15;
+                // ULTRA FAST RISING SPEED (15.0 - 28.0 px/frame)
+                this.speedY = Math.random() * 13.0 + 15.0;
+                this.amplitudeX = Math.random() * 30 + 15;
                 this.frequencyX = Math.random() * 0.05 + 0.04;
                 this.phaseX = Math.random() * Math.PI * 2;
-                this.rotation = (Math.random() - 0.5) * 0.4;
+                this.rotation = (Math.random() - 0.5) * 0.3;
             }
 
             update() {
@@ -360,16 +363,16 @@
         }
 
         // ----------------------------------------------------
-        // Glitter Sparkle Engine
+        // Glitter Sparkle Engine (Lightweight Mobile GPU)
         // ----------------------------------------------------
         function initGlitter(w, h) {
             glitterParticles = [];
             const colors = ['#ffffff', '#ffb6c1', '#ffe4e1', '#ffd700', '#e6e6fa'];
-            for (let i = 0; i < 70; i++) {
+            for (let i = 0; i < 40; i++) {
                 glitterParticles.push({
                     x: Math.random() * w,
                     y: Math.random() * h,
-                    size: Math.random() * 4 + 2,
+                    size: Math.random() * 3 + 2,
                     color: colors[Math.floor(Math.random() * colors.length)],
                     phase: Math.random() * Math.PI * 2,
                     speed: Math.random() * 0.15 + 0.08,
@@ -392,7 +395,7 @@
                 ctx.globalAlpha = alpha;
                 ctx.fillStyle = p.color;
                 ctx.strokeStyle = p.color;
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 1.2;
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -460,37 +463,24 @@
             if (isVGestureActive) {
                 statusBadge.classList.add('active');
                 statusText.innerText = '✌️ V GESTURE ACTIVE 💕';
+                canvasElement.classList.add('blurred'); // Instant GPU CSS Hardware Blur!
             } else {
                 statusBadge.classList.remove('active');
                 statusText.innerText = '✌️ Show V Gesture';
+                canvasElement.classList.remove('blurred');
             }
-
-            // Zero-Delay Fast Blur Transition
-            const targetBlur = isVGestureActive ? 1.0 : 0.0;
-            blurFactor += (targetBlur - blurFactor) * 0.45;
 
             canvasCtx.clearRect(0, 0, w, h);
 
-            // ----------------------------------------------------
             // 1. Render Video Frame (Natural Aspect Ratio Cover)
-            // ----------------------------------------------------
-            if (blurFactor > 0.01) {
-                canvasCtx.save();
-                canvasCtx.filter = `blur(${Math.round(25 * blurFactor)}px) brightness(0.9)`;
-                drawImageCover(canvasCtx, results.image, w, h);
-                canvasCtx.restore();
-            } else {
-                drawImageCover(canvasCtx, results.image, w, h);
-            }
+            drawImageCover(canvasCtx, results.image, w, h);
 
-            // ----------------------------------------------------
             // 2. Render Fast Floating Emojis & Photos (Spaced Out)
-            // ----------------------------------------------------
             if (isVGestureActive) {
-                const spawnCount = Math.floor(Math.random() * 3) + 3;
+                const spawnCount = Math.floor(Math.random() * 2) + 2;
                 for (let i = 0; i < spawnCount; i++) {
-                    if (activeFloatingItems.length < 45) {
-                        activeFloatingItems.push(new FloatingItem(w, h, handCenterX, handCenterY, activeFloatingItems));
+                    if (activeFloatingItems.length < 28) {
+                        activeFloatingItems.push(new FloatingItem(w, h, handCenterX, handCenterY));
                     }
                 }
 
@@ -505,9 +495,7 @@
                 activeFloatingItems = [];
             }
 
-            // ----------------------------------------------------
             // 3. Draw 21 Landmark Hand Tracking Dots & Skeleton
-            // ----------------------------------------------------
             if (results.multiHandLandmarks) {
                 for (const landmarks of results.multiHandLandmarks) {
                     drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00ffff', lineWidth: 3 });
@@ -517,7 +505,7 @@
         }
 
         // ----------------------------------------------------
-        // MediaPipe Hands Config
+        // MediaPipe Hands Config (Tuned for Fast Mobile Performance)
         // ----------------------------------------------------
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -525,14 +513,14 @@
 
         hands.setOptions({
             maxNumHands: 2,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.55,
-            minTrackingConfidence: 0.55
+            modelComplexity: 0, // Lite Model for 60 FPS Mobile Performance
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
         hands.onResults(onResults);
 
-        // Start Camera Stream
+        // Start Mobile Camera Stream (Optimized 640x480 for 60 FPS)
         function startCamera(facing) {
             if (camera) {
                 camera.stop();
@@ -541,8 +529,8 @@
                 onFrame: async () => {
                     await hands.send({ image: videoElement });
                 },
-                width: 1280,
-                height: 720,
+                width: 640,
+                height: 480,
                 facingMode: facing
             });
             camera.start();
@@ -589,21 +577,21 @@
                     const img = new Image();
                     img.onload = function() {
                         const cvs = document.createElement('canvas');
-                        cvs.width = 180;
-                        cvs.height = 180;
+                        cvs.width = 160;
+                        cvs.height = 160;
                         const ctx = cvs.getContext('2d');
 
                         ctx.beginPath();
-                        ctx.arc(90, 90, 80, 0, Math.PI * 2);
+                        ctx.arc(80, 80, 70, 0, Math.PI * 2);
                         ctx.clip();
 
-                        ctx.drawImage(img, 0, 0, 180, 180);
+                        ctx.drawImage(img, 0, 0, 160, 160);
 
-                        ctx.lineWidth = 10;
+                        ctx.lineWidth = 8;
                         ctx.strokeStyle = '#ff69b4';
                         ctx.stroke();
 
-                        ctx.lineWidth = 4;
+                        ctx.lineWidth = 3;
                         ctx.strokeStyle = '#ffd700';
                         ctx.stroke();
 
