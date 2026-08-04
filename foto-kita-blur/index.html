@@ -72,7 +72,6 @@
             z-index: 1;
         }
 
-        /* Soft, Natural Soft Blur (Not Extreme) */
         #bg-canvas.blurred {
             filter: blur(10px) brightness(0.92);
         }
@@ -155,6 +154,14 @@
             border: 1px solid rgba(255, 255, 255, 0.18);
             border-radius: 30px;
             max-width: 95vw;
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* AUTO-HIDE CONTROLS BAR IN FULLSCREEN MODE (Zero Distraction) */
+        .controls-bar.hidden-full {
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transform: translateX(-50%) translateY(30px) !important;
         }
 
         .control-btn {
@@ -243,7 +250,7 @@
         </div>
 
         <!-- Bottom Controls -->
-        <div class="controls-bar">
+        <div class="controls-bar" id="controls-bar">
             <button class="control-btn" id="fullscreen-btn">🔲 Fullscreen</button>
             <button class="control-btn" id="flip-cam-btn">🔄 Camera</button>
             <button class="control-btn" id="upload-photo-btn">📸 Add Photo</button>
@@ -271,6 +278,7 @@
         const statusBadge = document.getElementById('status-badge');
         const statusText = document.getElementById('status-text');
         const loaderScreen = document.getElementById('loader-screen');
+        const controlsBar = document.getElementById('controls-bar');
         const fullscreenBtn = document.getElementById('fullscreen-btn');
         const flipCamBtn = document.getElementById('flip-cam-btn');
         const uploadPhotoBtn = document.getElementById('upload-photo-btn');
@@ -483,7 +491,7 @@
             if (isVGestureActive) {
                 statusBadge.classList.add('active');
                 statusText.innerText = '✌️ V GESTURE ACTIVE 💕';
-                bgCanvas.classList.add('blurred'); // Soft natural blur on VIDEO BACKGROUND ONLY!
+                bgCanvas.classList.add('blurred');
             } else {
                 statusBadge.classList.remove('active');
                 statusText.innerText = '✌️ Show V Gesture';
@@ -561,6 +569,30 @@
         startCamera(facingMode);
 
         // ----------------------------------------------------
+        // Fullscreen Change Event Listener (Auto Hide Controls Bar)
+        // ----------------------------------------------------
+        function handleFullscreenChange() {
+            const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+            if (isFull) {
+                controlsBar.classList.add('hidden-full');
+            } else {
+                controlsBar.classList.remove('hidden-full');
+            }
+        }
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+        // Tap screen anywhere in Fullscreen to toggle controls bar visibility
+        document.getElementById('app-container').addEventListener('click', (e) => {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                if (!e.target.closest('.controls-bar')) {
+                    controlsBar.classList.toggle('hidden-full');
+                }
+            }
+        });
+
+        // ----------------------------------------------------
         // User Controls (Fullscreen, Switch Camera, & Upload Photo)
         // ----------------------------------------------------
         fullscreenBtn.addEventListener('click', () => {
@@ -571,14 +603,12 @@
                 } else if (docEl.webkitRequestFullscreen) {
                     docEl.webkitRequestFullscreen();
                 }
-                fullscreenBtn.innerText = '📉 Exit Full';
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
                 } else if (document.webkitExitFullscreen) {
                     document.webkitExitFullscreen();
                 }
-                fullscreenBtn.innerText = '🔲 Fullscreen';
             }
         });
 
