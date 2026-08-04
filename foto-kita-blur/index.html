@@ -58,21 +58,36 @@
             display: none;
         }
 
-        /* Main Canvas Render Window (GPU Hardware Accelerated Blur) */
-        #output-canvas {
+        /* Layer 1: Background Video Canvas (Gets Soft Blur) */
+        #bg-canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror feel */
+            transform: scaleX(-1);
             transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             will-change: filter;
+            z-index: 1;
         }
 
-        #output-canvas.blurred {
-            filter: blur(20px) brightness(0.85);
+        /* Soft, Natural Soft Blur (Not Extreme) */
+        #bg-canvas.blurred {
+            filter: blur(10px) brightness(0.92);
+        }
+
+        /* Layer 2: Foreground Overlay Canvas (ALWAYS 100% CRISP & SHARP) */
+        #fg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            pointer-events: none;
+            z-index: 2;
         }
 
         /* Glassmorphic UI Header Badge */
@@ -215,8 +230,11 @@
         <!-- Hidden Video Input -->
         <video id="webcam-video" playsinline></video>
 
-        <!-- Main Canvas -->
-        <canvas id="output-canvas"></canvas>
+        <!-- Layer 1: Background Video Only (Gets Soft Blur) -->
+        <canvas id="bg-canvas"></canvas>
+
+        <!-- Layer 2: Foreground Overlay (Emojis, Photos, Skeleton - ALWAYS 100% SHARP) -->
+        <canvas id="fg-canvas"></canvas>
 
         <!-- Top Header Status Badge -->
         <div class="ui-header" id="status-badge">
@@ -245,8 +263,11 @@
         // Web Application State & DOM Elements
         // ----------------------------------------------------
         const videoElement = document.getElementById('webcam-video');
-        const canvasElement = document.getElementById('output-canvas');
-        const canvasCtx = canvasElement.getContext('2d');
+        const bgCanvas = document.getElementById('bg-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        const fgCanvas = document.getElementById('fg-canvas');
+        const fgCtx = fgCanvas.getContext('2d');
+
         const statusBadge = document.getElementById('status-badge');
         const statusText = document.getElementById('status-text');
         const loaderScreen = document.getElementById('loader-screen');
@@ -314,14 +335,13 @@
         }
 
         // ----------------------------------------------------
-        // Floating Item Engine (Mobile GPU Optimized & Spaced Out)
+        // Floating Item Engine (100% Crisp & Sharp Overlay)
         // ----------------------------------------------------
         class FloatingItem {
             constructor(w, h, handX, handY) {
                 const totalAssets = [...emojiCanvases, ...loadedPhotoCanvas];
                 this.canvasAsset = totalAssets[Math.floor(Math.random() * totalAssets.length)];
                 
-                // Optimized Mobile Sticker Scaling
                 const minSz = Math.max(65, Math.floor(h * 0.11));
                 const maxSz = Math.max(120, Math.floor(h * 0.18));
                 this.size = Math.floor(Math.random() * (maxSz - minSz)) + minSz;
@@ -434,8 +454,8 @@
                 setTimeout(() => loaderScreen.style.visibility = 'hidden', 500);
             }
 
-            const w = canvasElement.width = window.innerWidth;
-            const h = canvasElement.height = window.innerHeight;
+            const w = bgCanvas.width = fgCanvas.width = window.innerWidth;
+            const h = bgCanvas.height = fgCanvas.height = window.innerHeight;
 
             if (glitterParticles.length === 0) {
                 initGlitter(w, h);
@@ -463,19 +483,21 @@
             if (isVGestureActive) {
                 statusBadge.classList.add('active');
                 statusText.innerText = '✌️ V GESTURE ACTIVE 💕';
-                canvasElement.classList.add('blurred'); // Instant GPU CSS Hardware Blur!
+                bgCanvas.classList.add('blurred'); // Soft natural blur on VIDEO BACKGROUND ONLY!
             } else {
                 statusBadge.classList.remove('active');
                 statusText.innerText = '✌️ Show V Gesture';
-                canvasElement.classList.remove('blurred');
+                bgCanvas.classList.remove('blurred');
             }
 
-            canvasCtx.clearRect(0, 0, w, h);
+            // Clear Both Canvases
+            bgCtx.clearRect(0, 0, w, h);
+            fgCtx.clearRect(0, 0, w, h);
 
-            // 1. Render Video Frame (Natural Aspect Ratio Cover)
-            drawImageCover(canvasCtx, results.image, w, h);
+            // 1. LAYER 1: Render Video Background (Gets Soft Blur)
+            drawImageCover(bgCtx, results.image, w, h);
 
-            // 2. Render Fast Floating Emojis & Photos (Spaced Out)
+            // 2. LAYER 2: Render Emojis, Photos, Glitter & Hand Skeleton on Foreground (100% SHARP)
             if (isVGestureActive) {
                 const spawnCount = Math.floor(Math.random() * 2) + 2;
                 for (let i = 0; i < spawnCount; i++) {
@@ -486,20 +508,20 @@
 
                 activeFloatingItems.forEach(item => {
                     item.update();
-                    item.draw(canvasCtx);
+                    item.draw(fgCtx);
                 });
 
                 activeFloatingItems = activeFloatingItems.filter(item => item.y > -item.size - 20);
-                drawGlitter(canvasCtx, w, h);
+                drawGlitter(fgCtx, w, h);
             } else {
                 activeFloatingItems = [];
             }
 
-            // 3. Draw 21 Landmark Hand Tracking Dots & Skeleton
+            // 3. Draw 21 Landmark Hand Tracking Skeleton & Dots on Foreground (100% SHARP)
             if (results.multiHandLandmarks) {
                 for (const landmarks of results.multiHandLandmarks) {
-                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00ffff', lineWidth: 3 });
-                    drawLandmarks(canvasCtx, landmarks, { color: '#ff007f', fillColor: '#00ff00', lineWidth: 2, radius: 5 });
+                    drawConnectors(fgCtx, landmarks, HAND_CONNECTIONS, { color: '#00ffff', lineWidth: 3 });
+                    drawLandmarks(fgCtx, landmarks, { color: '#ff007f', fillColor: '#00ff00', lineWidth: 2, radius: 5 });
                 }
             }
         }
@@ -513,7 +535,7 @@
 
         hands.setOptions({
             maxNumHands: 2,
-            modelComplexity: 0, // Lite Model for 60 FPS Mobile Performance
+            modelComplexity: 0,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
@@ -606,9 +628,9 @@
 
         // Window Resize Handler
         window.addEventListener('resize', () => {
-            canvasElement.width = window.innerWidth;
-            canvasElement.height = window.innerHeight;
-            initGlitter(canvasElement.width, canvasElement.height);
+            bgCanvas.width = fgCanvas.width = window.innerWidth;
+            bgCanvas.height = fgCanvas.height = window.innerHeight;
+            initGlitter(bgCanvas.width, bgCanvas.height);
         });
     </script>
 </body>
